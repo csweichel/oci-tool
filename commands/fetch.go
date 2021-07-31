@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"os"
 
 	"github.com/containerd/containerd/remotes"
@@ -19,10 +20,28 @@ var Fetch = &cli.Command{
 	// Action:    actionFetchDirect,
 	Subcommands: []*cli.Command{
 		{
-			Name:      "config",
-			Usage:     "fetches the config of an image - assumes ref points to a manifest",
+			Name:      "image",
+			Usage:     "fetches an image's metadata - assumes ref points to a manifest",
 			ArgsUsage: "<ref>",
-			Action:    actionFetchConfig,
+			Action:    actionFetchImageMD,
+			Flags: []cli.Flag{
+				&cli.StringFlag{
+					Name:  "platform",
+					Usage: "select a particular platform",
+				},
+			},
+		},
+		{
+			Name:      "manifest",
+			Usage:     "fetches an image manifest",
+			ArgsUsage: "<ref>",
+			Action:    actionFetchManifest,
+			Flags: []cli.Flag{
+				&cli.StringFlag{
+					Name:  "platform",
+					Usage: "select a particular platform",
+				},
+			},
 		},
 		{
 			Name:      "raw",
@@ -45,6 +64,107 @@ var Fetch = &cli.Command{
 			Usage: "parses the OCI descriptor of the object to fetch from STDIN. --digest and --media-type override values parsed from STDIN.",
 		},
 	},
+}
+
+func actionFetchManifest(c *cli.Context) error {
+	ref := fromArgsGetRef(c, "manifest")
+
+	dgst, err := fromFlagsGetDigest(c)
+	if err != nil {
+		return err
+	}
+
+	res, err := fromFlagsGetResolver(c)
+	if err != nil {
+		return err
+	}
+
+	ctx, cancel := fromFlagsGetContext(c)
+	defer cancel()
+
+	plt := c.String("platform")
+
+	_, mf, err := interactiveFetchManifestOrIndex(ctx, res, ref, plt, dgst)
+	if err != nil {
+		return err
+	}
+
+	enc := json.NewEncoder(os.Stdout)
+	enc.SetIndent("", "  ")
+	return enc.Encode(mf)
+}
+
+func interactiveFetchManifestOrIndex(ctx context.Context, res remotes.Resolver, ref, plt string, dgst digest.Digest) (name string, result *ociv1.Manifest, err error) {
+	resolved, desc, err := res.Resolve(ctx, ref)
+	if err != nil {
+		return "", nil, fmt.Errorf("cannot resolve %v: %w", ref, err)
+	}
+
+	if dgst != "" {
+		desc.Digest = dgst
+	}
+
+	fetcher, err := res.Fetcher(ctx, resolved)
+	if err != nil {
+		return "", nil, err
+	}
+
+	in, err := fetcher.Fetch(ctx, desc)
+	if err != nil {
+		return "", nil, err
+	}
+	defer in.Close()
+	buf, err := ioutil.ReadAll(in)
+	if err != nil {
+		return "", nil, err
+	}
+
+	var mf ociv1.Manifest
+	err = json.Unmarshal(buf, &mf)
+	if err != nil {
+		return "", nil, fmt.Errorf("cannot unmarshal manifest: %w", err)
+	}
+
+	if mf.Config.Size != 0 {
+		return resolved, &mf, nil
+	}
+
+	var mfl ociv1.Index
+	err = json.Unmarshal(buf, &mfl)
+	if err != nil {
+		return "", nil, err
+	}
+
+	if plt != "" {
+		var dgst digest.Digest
+		for _, mf := range mfl.Manifests {
+			if fmt.Sprintf("%s-%s", mf.Platform.OS, mf.Platform.Architecture) == plt {
+				dgst = mf.Digest
+			}
+		}
+		if dgst == "" {
+			return "", nil, fmt.Errorf("no manifest for platform %s found", plt)
+		}
+
+		fmt.Fprintf(os.Stderr, "found manifest for %s: %s\n", plt, dgst)
+
+		var mf *ociv1.Manifest
+		_, mf, err = fetchManifest(ctx, res, resolved, dgst)
+		if err != nil {
+			return "", nil, err
+		}
+
+		return resolved, mf, nil
+	}
+
+	fmt.Fprintf(os.Stderr, "%s points to an index rather than a manifest.\n", ref)
+	fmt.Fprintf(os.Stderr, "Use --platform to select a manifest. Possible choices are:\n")
+	for _, mf := range mfl.Manifests {
+		fmt.Fprintf(os.Stderr, "\t%s-%s\n", mf.Platform.OS, mf.Platform.Architecture)
+	}
+
+	os.Exit(2)
+	return "", nil, nil
 }
 
 func fetchManifest(ctx context.Context, res remotes.Resolver, ref string, dgst digest.Digest) (resolvedName string, mf *ociv1.Manifest, err error) {
@@ -112,7 +232,7 @@ func fromFlagsGetDigest(c *cli.Context) (digest.Digest, error) {
 	return res, nil
 }
 
-func actionFetchConfig(c *cli.Context) error {
+func actionFetchImageMD(c *cli.Context) error {
 	ref := fromArgsGetRef(c, "config")
 
 	res, err := fromFlagsGetResolver(c)
@@ -123,12 +243,14 @@ func actionFetchConfig(c *cli.Context) error {
 	ctx, cancel := fromFlagsGetContext(c)
 	defer cancel()
 
-	digest, err := fromFlagsGetDigest(c)
+	dgst, err := fromFlagsGetDigest(c)
 	if err != nil {
 		return err
 	}
 
-	name, mf, err := fetchManifest(ctx, res, ref, digest)
+	plt := c.String("platform")
+
+	name, mf, err := interactiveFetchManifestOrIndex(ctx, res, ref, plt, dgst)
 	if err != nil {
 		return err
 	}
@@ -144,12 +266,16 @@ func actionFetchConfig(c *cli.Context) error {
 	}
 	defer cfgin.Close()
 
-	_, err = io.Copy(os.Stdout, cfgin)
+	var ctn map[string]interface{}
+
+	err = json.NewDecoder(cfgin).Decode(&ctn)
 	if err != nil {
 		return err
 	}
 
-	return nil
+	enc := json.NewEncoder(os.Stdout)
+	enc.SetIndent("", "  ")
+	return enc.Encode(ctn)
 }
 
 func actionFetchDirect(c *cli.Context) error {

@@ -37,6 +37,10 @@ var Layer = &cli.Command{
 			Name:  "digest",
 			Usage: "digest of the object where to start from",
 		},
+		&cli.StringFlag{
+			Name:  "platform",
+			Usage: "select a particular platform",
+		},
 	},
 }
 
@@ -50,12 +54,14 @@ func actionListLayer(c *cli.Context) error {
 	ctx, cancel := fromFlagsGetContext(c)
 	defer cancel()
 
-	digest, err := fromFlagsGetDigest(c)
+	dgst, err := fromFlagsGetDigest(c)
 	if err != nil {
 		return err
 	}
 
-	resolved, mf, err := fetchManifest(ctx, res, ref, digest)
+	plt := c.String("platform")
+
+	resolved, mf, err := interactiveFetchManifestOrIndex(ctx, res, ref, plt, dgst)
 	if err != nil {
 		return err
 	}
@@ -84,12 +90,14 @@ func actionSizeLayer(c *cli.Context) error {
 	ctx, cancel := fromFlagsGetContext(c)
 	defer cancel()
 
-	digest, err := fromFlagsGetDigest(c)
+	dgst, err := fromFlagsGetDigest(c)
 	if err != nil {
 		return err
 	}
 
-	_, mf, err := fetchManifest(ctx, res, ref, digest)
+	plt := c.String("platform")
+
+	_, mf, err := interactiveFetchManifestOrIndex(ctx, res, ref, plt, dgst)
 	if err != nil {
 		return err
 	}
