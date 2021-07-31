@@ -6,6 +6,10 @@ Handy little CLI for interacting with OCI data
 go get github.com/csweichel/oci-tool
 ```
 
+I use Gitpod for developing this tool; you should, too :)
+
+[![Open in Gitpod](https://gitpod.io/button/open-in-gitpod.svg)](https://gitpod.io/#https://github.com/csweichel/oci-tool)
+
 # Common Tasks
 
 > Note: using a `$ref` is by no means a requirement - it's just really handy for the examples.
