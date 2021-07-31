@@ -8,6 +8,8 @@ go get github.com/csweichel/oci-tool
 
 # Common Tasks
 
+> Note: using a `$ref` is by no means a requirement - it's just really handy for the examples.
+
 ## Fetching raw data
 
 When exploring a registry's content, starting with some raw data is handy.
