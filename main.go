@@ -15,6 +15,7 @@ var app = &cli.App{
 	Commands: []*cli.Command{
 		commands.Fetch,
 		commands.Layer,
+		commands.Resolve,
 	},
 	Flags: []cli.Flag{
 		&cli.PathFlag{

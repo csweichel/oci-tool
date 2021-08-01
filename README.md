@@ -67,6 +67,16 @@ oci-tool layer --platform=linux-amd64 list $ref
 oci-tool layer --platform=linux-amd64 list --unpacked $ref
 ```
 
+## Resolving references
+
+```bash
+# resolve alpine:latest to it's non-familiar digested name
+oci-tool resolve name alpine:latest
+
+# print the descriptor a reference resolves to
+oci-tool resolve descriptor docker.io/library/alpine:latest
+```
+
 # Uncommon tasks
 
 With the primitives outlined above you can alrady to a lot of fun things, especially when combined with [jq](https://stedolan.github.io/jq/) and some bash.
