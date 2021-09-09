@@ -3,7 +3,7 @@ Handy little CLI for interacting with OCI data
 
 # Installation
 ```bash
-go get github.com/csweichel/oci-tool
+go install github.com/csweichel/oci-tool@latest
 ```
 
 I use Gitpod for developing this tool; you should, too :)
