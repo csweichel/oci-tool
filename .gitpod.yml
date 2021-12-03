@@ -1,3 +1,8 @@
+
 tasks:
   - init: go mod download && go install
     command: oci-tool fetch raw docker.io/library/alpine:latest | jq
+
+vscode:
+  extensions:
+    - golang.go

@@ -94,6 +94,10 @@ var Fetch = &cli.Command{
 			Name:  "descriptor-from-stdin",
 			Usage: "parses the OCI descriptor of the object to fetch from STDIN. --digest and --media-type override values parsed from STDIN.",
 		},
+		&cli.BoolFlag{
+			Name:  "insecure",
+			Usage: "fetch via HTTP rather than HTTPS",
+		},
 	},
 }
 
