@@ -22,30 +22,35 @@ func fromFlagsGetResolver(c *cli.Context) (res remotes.Resolver, err error) {
 			return nil, err
 		}
 	}
-	auth := docker.ConfigureDefaultRegistries(authRegOpt)
+	var auth docker.RegistryHosts
+	if authRegOpt != nil {
+		auth = docker.ConfigureDefaultRegistries(authRegOpt)
+	}
 
 	insecure := c.Bool("insecure")
 
 	var resolverOpts docker.ResolverOptions
-	resolverOpts.Hosts = func(s string) (res []docker.RegistryHost, err error) {
-		if auth != nil {
-			res, err = auth(s)
-			if err != nil {
-				return nil, err
-			}
-		}
-
-		if insecure {
-			if len(res) == 0 {
-				res = []docker.RegistryHost{{Scheme: "http"}}
-			} else {
-				for i := range res {
-					res[i].Scheme = "http"
+	if auth != nil || insecure {
+		resolverOpts.Hosts = func(s string) (res []docker.RegistryHost, err error) {
+			if auth != nil {
+				res, err = auth(s)
+				if err != nil {
+					return nil, err
 				}
 			}
-		}
 
-		return
+			if insecure {
+				if len(res) == 0 {
+					res = []docker.RegistryHost{{Scheme: "http"}}
+				} else {
+					for i := range res {
+						res[i].Scheme = "http"
+					}
+				}
+			}
+
+			return
+		}
 	}
 
 	return docker.NewResolver(resolverOpts), nil
