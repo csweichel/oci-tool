@@ -441,7 +441,7 @@ func actionFetchLayer(c *cli.Context) error {
 	// TODO: determine file ending based on content type
 	fn := c.String("output")
 	if fn == "" {
-		fn = layer.Digest.Hex() + "tar.gz"
+		fn = layer.Digest.Hex() + ".tar.gz"
 	}
 	f, err := os.OpenFile(fn, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0644)
 	if err != nil {
