@@ -50,6 +50,18 @@ oci-tool fetch manifest --platform=linux-amd64 $ref
 oci-tool fetch iamge --platform=linux-amd64 $ref
 ```
 
+## Fetching a file from a layer
+
+```
+export ref=docker.io/library/alpine:latest
+
+# download busybox from alpine
+oci-tool fetch file --platform=linux-amd64 $ref bin/busybox
+
+# list all files in the layers
+oci-tool --verbose fetch file --platform=linux-amd64 $ref does-not-exist
+```
+
 ## Inspecting image layer
 
 > Note: If ref points to an index rather than a manifest, you can also use `--digest` instead of `--platform` and point to a specific manifest directly.
@@ -66,6 +78,7 @@ oci-tool layer --platform=linux-amd64 list $ref
 # list all layer digests after unpacking
 oci-tool layer --platform=linux-amd64 list --unpacked $ref
 ```
+
 
 ## Resolving references
 

@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/csweichel/oci-tool/commands"
+	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli/v2"
 )
 
@@ -28,6 +29,17 @@ var app = &cli.App{
 			Usage: "timeout for the entire operation",
 			Value: 1 * time.Minute,
 		},
+		&cli.BoolFlag{
+			Name:  "verbose",
+			Usage: "enable verbose debug logging",
+			Value: false,
+		},
+	},
+	Before: func(c *cli.Context) error {
+		if c.Bool("verbose") {
+			logrus.SetLevel(logrus.DebugLevel)
+		}
+		return nil
 	},
 	EnableBashCompletion: true,
 }

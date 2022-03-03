@@ -1,18 +1,22 @@
 package commands
 
 import (
+	"archive/tar"
+	"compress/gzip"
 	"context"
 	"encoding/json"
 	"fmt"
 	"io"
 	"io/ioutil"
 	"os"
+	"path/filepath"
 	"strconv"
 
 	"github.com/containerd/containerd/remotes"
 	"github.com/opencontainers/go-digest"
 	ociv1 "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/schollz/progressbar/v3"
+	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli/v2"
 )
 
@@ -79,6 +83,29 @@ var Fetch = &cli.Command{
 				},
 			},
 			Action: actionFetchLayer,
+		},
+		{
+			Name:      "file",
+			Usage:     "downloads a file from a layer blob",
+			ArgsUsage: "<ref> <path>",
+			Flags: []cli.Flag{
+				&cli.StringFlag{
+					Name:        "output",
+					Aliases:     []string{"o"},
+					TakesFile:   true,
+					DefaultText: "<basename(path)>",
+					Usage:       "output path",
+				},
+				&cli.StringFlag{
+					Name:  "platform",
+					Usage: "select a particular platform",
+				},
+				&cli.BoolFlag{
+					Name:    "quiet",
+					Aliases: []string{"q"},
+				},
+			},
+			Action: actionFetchFile,
 		},
 	},
 	Flags: []cli.Flag{
@@ -464,4 +491,118 @@ func actionFetchLayer(c *cli.Context) error {
 	}
 
 	return nil
+}
+
+func actionFetchFile(c *cli.Context) error {
+	ref := fromArgsGetRef(c, "file")
+
+	path := c.Args().Get(1)
+	if path == "" {
+		fmt.Println("missing path")
+		cli.ShowCommandHelpAndExit(c, "file", 1)
+	}
+
+	dgst, err := fromFlagsGetDigest(c)
+	if err != nil {
+		return err
+	}
+
+	res, err := fromFlagsGetResolver(c)
+	if err != nil {
+		return err
+	}
+
+	ctx, cancel := fromFlagsGetContext(c)
+	defer cancel()
+
+	plt := c.String("platform")
+
+	_, mf, err := interactiveFetchManifestOrIndex(ctx, res, ref, plt, dgst)
+	if err != nil {
+		return err
+	}
+	if len(mf.Layers) == 0 {
+		return fmt.Errorf("manifest has no layer")
+	}
+
+	fetcher, err := res.Fetcher(ctx, ref)
+	if err != nil {
+		return err
+	}
+
+	fn := c.String("output")
+	if fn == "" {
+		fn = filepath.Base(path)
+	}
+
+	for i := range mf.Layers {
+		// we look from the last layers first, because it's more likely we'll find
+		// what we're looking for
+		layer := mf.Layers[len(mf.Layers)-(i+1)]
+
+		found, err := downloadFileFromLayer(ctx, fetcher, layer, fn, path, c.Bool("quiet"))
+		if err != nil {
+			return err
+		}
+		if found {
+			return nil
+		}
+	}
+
+	return fmt.Errorf("file %s not found", path)
+}
+
+func downloadFileFromLayer(ctx context.Context, fetcher remotes.Fetcher, layer ociv1.Descriptor, dst, path string, quiet bool) (found bool, err error) {
+	dl, err := fetcher.Fetch(ctx, layer)
+	if err != nil {
+		return false, err
+	}
+	defer dl.Close()
+
+	var pin io.Reader
+	if quiet {
+		pin = dl
+	} else {
+		bar := progressbar.DefaultBytes(
+			layer.Size,
+			"downloading "+layer.Digest.String()+" ",
+		)
+		r := progressbar.NewReader(dl, bar)
+		pin = &r
+	}
+
+	gzin, err := gzip.NewReader(pin)
+	if err != nil {
+		return false, err
+	}
+
+	tarin := tar.NewReader(gzin)
+	for {
+		hdr, err := tarin.Next()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			return false, err
+		}
+		logrus.WithField("layer", layer.Digest.String()).WithField("file", hdr.Name).Debug("scanning layer")
+		if hdr.Name != path {
+			continue
+		}
+
+		out, err := os.OpenFile(dst, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0644)
+		if err != nil {
+			return true, err
+		}
+		defer out.Close()
+		n, err := io.Copy(out, io.LimitReader(tarin, hdr.Size))
+		if err != nil {
+			return true, err
+		}
+		if n != hdr.Size {
+			return true, io.ErrShortWrite
+		}
+		return true, nil
+	}
+	return false, nil
 }
