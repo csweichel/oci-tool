@@ -5,9 +5,10 @@ import (
 	"os"
 	"time"
 
-	"github.com/csweichel/oci-tool/commands"
 	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli/v2"
+
+	"github.com/csweichel/oci-tool/commands"
 )
 
 var app = &cli.App{
