@@ -1,6 +1,6 @@
 module github.com/csweichel/oci-tool
 
-go 1.21
+go 1.26
 
 require (
 	github.com/containerd/containerd v1.7.8
