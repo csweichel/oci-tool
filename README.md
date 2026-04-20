@@ -47,7 +47,7 @@ oci-tool fetch manifest $ref
 oci-tool fetch manifest --platform=linux-amd64 $ref
 
 # fetch the image config
-oci-tool fetch iamge --platform=linux-amd64 $ref
+oci-tool fetch image --platform=linux-amd64 $ref
 ```
 
 ## Fetching a file from a layer
@@ -92,7 +92,7 @@ oci-tool resolve descriptor docker.io/library/alpine:latest
 
 # Uncommon tasks
 
-With the primitives outlined above you can alrady to a lot of fun things, especially when combined with [jq](https://stedolan.github.io/jq/) and some bash.
+With the primitives outlined above you can already to a lot of fun things, especially when combined with [jq](https://stedolan.github.io/jq/) and some bash.
 
 ## Finding the layer diff between two images
 ```bash
