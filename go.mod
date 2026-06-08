@@ -2,6 +2,8 @@ module github.com/csweichel/oci-tool
 
 go 1.26
 
+toolchain go1.26.4
+
 require (
 	github.com/containerd/containerd v1.7.8
 	github.com/docker/cli v24.0.7+incompatible
